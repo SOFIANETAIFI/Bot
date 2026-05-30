@@ -15,7 +15,14 @@ const IMAGE_PATH = path.join(__dirname, "welcome.jpg");
 
 const TEST_NUMBER = "212708026291@s.whatsapp.net";
 
-const WELCOME_TEXT = "👋 مرحباً، شكراً لتواصلك معنا.";
+const WELCOME_TEXT = `
+👋 مرحباً بك
+
+شكراً لتواصلك معنا.
+تم استلام رسالتك وسنقوم بالرد عليك في أقرب وقت ممكن.
+
+🌹 نتمنى لك يوماً سعيداً.
+`;
 
 let testSent = false;
 
@@ -29,14 +36,39 @@ async function loadUsers() {
 
 async function saveUser(jid) {
   const users = await loadUsers();
+
   if (!users.includes(jid)) {
     users.push(jid);
-    await fs.writeFile(USERS_FILE, JSON.stringify(users, null, 2));
+
+    await fs.writeFile(
+      USERS_FILE,
+      JSON.stringify(users, null, 2)
+    );
+  }
+}
+
+async function sendWelcome(sock, jid) {
+  try {
+    if (fsSync.existsSync(IMAGE_PATH)) {
+      await sock.sendMessage(jid, {
+        image: fsSync.readFileSync(IMAGE_PATH),
+        caption: WELCOME_TEXT
+      });
+    } else {
+      console.log("⚠️ الصورة غير موجودة:", IMAGE_PATH);
+
+      await sock.sendMessage(jid, {
+        text: WELCOME_TEXT
+      });
+    }
+  } catch (err) {
+    console.error("❌ فشل إرسال الترحيب:", err);
   }
 }
 
 async function start() {
-  const { state, saveCreds } = await useMultiFileAuthState("auth");
+  const { state, saveCreds } =
+    await useMultiFileAuthState("auth");
 
   const sock = makeWASocket({
     auth: state,
@@ -48,10 +80,12 @@ async function start() {
   sock.ev.on("connection.update", async (update) => {
     const { connection, lastDisconnect, qr } = update;
 
-    // ✅ QR الحقيقي
     if (qr) {
-      console.log("\n📱 امسح QR التالي من واتساب:\n");
-      qrcode.generate(qr, { small: true });
+      console.log("\n📱 امسح QR التالي:\n");
+
+      qrcode.generate(qr, {
+        small: true
+      });
     }
 
     if (connection === "open") {
@@ -60,40 +94,62 @@ async function start() {
       if (!testSent) {
         testSent = true;
 
-        await sock.sendMessage(TEST_NUMBER, {
-          text: "🧪 البوت يعمل بنجاح ✅"
-        });
+        await sendWelcome(sock, TEST_NUMBER);
 
-        console.log("📨 تم إرسال اختبار");
+        console.log(
+          "📨 تم إرسال رسالة الترحيب التجريبية"
+        );
       }
     }
 
     if (connection === "close") {
-      const code = new Boom(lastDisconnect?.error)?.output?.statusCode;
-      const shouldReconnect = code !== DisconnectReason.loggedOut;
+      const code =
+        new Boom(lastDisconnect?.error)
+          ?.output?.statusCode;
+
+      const shouldReconnect =
+        code !== DisconnectReason.loggedOut;
 
       console.log("❌ انقطع الاتصال");
 
-      if (shouldReconnect) start();
+      if (shouldReconnect) {
+        start();
+      }
     }
   });
 
   sock.ev.on("messages.upsert", async ({ messages }) => {
-    const msg = messages[0];
-    if (!msg.message || msg.key.fromMe) return;
+    try {
+      const msg = messages[0];
 
-    const jid = msg.key.remoteJid;
+      if (!msg?.message) return;
+      if (msg.key.fromMe) return;
 
-    if (jid.endsWith("@g.us")) return;
+      const jid = msg.key.remoteJid;
 
-    const users = await loadUsers();
+      if (!jid) return;
 
-    if (!users.includes(jid)) {
-      await saveUser(jid);
+      // تجاهل المجموعات
+      if (jid.endsWith("@g.us")) return;
 
-      await sock.sendMessage(jid, {
-        text: WELCOME_TEXT
-      });
+      const users = await loadUsers();
+
+      // أول رسالة من المستخدم
+      if (!users.includes(jid)) {
+        await saveUser(jid);
+
+        await sendWelcome(sock, jid);
+
+        console.log(
+          "👋 تم إرسال الترحيب إلى:",
+          jid
+        );
+      }
+    } catch (err) {
+      console.error(
+        "❌ خطأ في استقبال الرسائل:",
+        err
+      );
     }
   });
 }
