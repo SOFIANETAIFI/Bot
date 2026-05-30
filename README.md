@@ -7,4 +7,4 @@ cd Bot
 
 npm install @whiskeysockets/baileys @hapi/boom qrcode-terminal
 
-node index.js
+node Index.js
