@@ -16,9 +16,9 @@ const qrcode = require("qrcode-terminal");
 // ──────────────────────────────────────────
 const USERS_FILE      = path.join(__dirname, "users.json");
 const ACTIVITY_FILE   = path.join(__dirname, "activity.json");
-const IMAGE_PATH      = path.join(__dirname, "media", "product.jpg");   // ← صورة المنتج
+const IMAGE_PATH      = path.join(__dirname, "media", "product.png");   // ← صورة المنتج
 const VIDEO_PATH      = path.join(__dirname, "media", "usage.mp4");     // ← فيديو طريقة الاستخدام
-const OFFER_IMAGE     = path.join(__dirname, "media", "offer.jpg");     // ← صورة العرض الاستثنائي
+const OFFER_IMAGE     = path.join(__dirname, "media", "offer.png");     // ← صورة العرض الاستثنائي
 
 const TEST_NUMBER     = "212708026291@s.whatsapp.net";
 const REMINDER_DELAY  = 24 * 60 * 60 * 1000; // 24 ساعة بالميلي ثانية
