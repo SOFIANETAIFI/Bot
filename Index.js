@@ -11,23 +11,17 @@ const fs = require("fs/promises");
 const path = require("path");
 const qrcode = require("qrcode-terminal");
 
-// ──────────────────────────────────────────
-// المسارات والإعدادات
-// ──────────────────────────────────────────
 const USERS_FILE      = path.join(__dirname, "users.json");
 const ACTIVITY_FILE   = path.join(__dirname, "activity.json");
-const IMAGE_PATH      = path.join(__dirname, "media", "product.png");   // ← صورة المنتج
-const VIDEO_PATH      = path.join(__dirname, "media", "usage.mp4");     // ← فيديو طريقة الاستخدام
-const OFFER_IMAGE     = path.join(__dirname, "media", "offer.png");     // ← صورة العرض الاستثنائي
+const IMAGE_PATH      = path.join(__dirname, "media", "product.png");
+const VIDEO_PATH      = path.join(__dirname, "media", "usage.mp4");
+const OFFER_IMAGE     = path.join(__dirname, "media", "offer.png");
 
 const TEST_NUMBER     = "212616346157@s.whatsapp.net";
-const REMINDER_DELAY  = 24 * 60 * 60 * 1000; // 24 ساعة بالميلي ثانية
+const REMINDER_DELAY  = 24 * 60 * 60 * 1000;
 
 let testSent = false;
 
-// ──────────────────────────────────────────
-// إدارة المستخدمين
-// ──────────────────────────────────────────
 async function loadJSON(file) {
   try {
     return JSON.parse(await fs.readFile(file, "utf8"));
@@ -53,9 +47,6 @@ async function saveUser(jid) {
   }
 }
 
-// ──────────────────────────────────────────
-// إدارة آخر نشاط للمستخدمين
-// ──────────────────────────────────────────
 async function setActivity(jid) {
   const data = await loadJSON(ACTIVITY_FILE);
   data[jid] = Date.now();
@@ -73,20 +64,27 @@ async function clearActivity(jid) {
   await saveJSON(ACTIVITY_FILE, data);
 }
 
-// ──────────────────────────────────────────
-// إرسال الرسالة الترحيبية مع صورة وأزرار
-// ──────────────────────────────────────────
 async function sendWelcomeMenu(sock, jid) {
-  await sendInteractiveMessage(sock, jid, {
+  await sock.sendMessage(jid, {
     image: { url: IMAGE_PATH },
-    text:
-      "👋 مرحباً بك!\n\n" +
+    caption:
       "💊 *اسم المنتج*\n" +
       "💰 99 درهم مع التوصيل مجاناً\n" +
       "🚚 الدفع عند الاستلام\n\n" +
-      "اختر أحد الخيارات التالية 👇",
+      "🛒 *للطلب يكفي تخلي لينا:*\n\n" +
+      "الاسم:\n" +
+      "رقم الهاتف:\n" +
+      "العنوان:\n\n" +
+      "🚚 فريق التوصيل سيتواصل معك في أقرب وقت.\n" +
+      "شكراً لثقتكم 🌷",
+  });
+
+  await sendInteractiveMessage(sock, jid, {
+    body:
+      "👋 *أهلاً بك!*\n\n" +
+      "اختر من الخيارات 👇",
     footer: "خدمة العملاء",
-    title: "عرضنا الحصري",
+    title: "🌟 مرحباً بك",
     interactiveButtons: [
       {
         name: "quick_reply",
@@ -106,17 +104,18 @@ async function sendWelcomeMenu(sock, jid) {
   });
 }
 
-// ──────────────────────────────────────────
-// إرسال عرض التذكير بعد 24 ساعة
-// ──────────────────────────────────────────
 async function sendReminderOffer(sock, jid) {
-  await sendInteractiveMessage(sock, jid, {
+  await sock.sendMessage(jid, {
     image: { url: OFFER_IMAGE },
-    text:
+    caption:
       "⏰ *عرض استثنائي خاص اليوم فقط!*\n\n" +
       "💊 *اسم المنتج*\n" +
       "💰 99 درهم مع التوصيل مجاناً\n" +
-      "🚚 الدفع عند الاستلام\n\n" +
+      "🚚 الدفع عند الاستلام",
+  });
+
+  await sendInteractiveMessage(sock, jid, {
+    body:
       "لا تفوّت الفرصة! اختر 👇",
     footer: "عرض محدود",
     title: "🔥 عرض اليوم فقط",
@@ -139,31 +138,24 @@ async function sendReminderOffer(sock, jid) {
   });
 }
 
-// ──────────────────────────────────────────
-// جدولة تذكير 24 ساعة
-// ──────────────────────────────────────────
 function scheduleReminder(sock, jid) {
   setTimeout(async () => {
     try {
-      // تحقق أن المستخدم لم يتفاعل منذ آخر نشاط
       const lastActive = await getActivity(jid);
-      if (!lastActive) return; // تفاعل أو تم إلغاء التذكير
+      if (!lastActive) return;
 
       const elapsed = Date.now() - lastActive;
       if (elapsed >= REMINDER_DELAY) {
         await sendReminderOffer(sock, jid);
-        console.log("⏰ تم إرسال التذكير إلى:", jid);
+        console.log("تم إرسال التذكير إلى:", jid);
         await clearActivity(jid);
       }
     } catch (err) {
-      console.error("❌ خطأ في إرسال التذكير:", err);
+      console.error("خطأ في إرسال التذكير:", err);
     }
   }, REMINDER_DELAY);
 }
 
-// ──────────────────────────────────────────
-// استخراج ID الزر المضغوط
-// ──────────────────────────────────────────
 function getSelectedId(msg) {
   try {
     const paramsJson =
@@ -173,14 +165,10 @@ function getSelectedId(msg) {
       return JSON.parse(paramsJson)?.id ?? null;
     }
   } catch {
-    // تجاهل
   }
   return null;
 }
 
-// ──────────────────────────────────────────
-// الدالة الرئيسية
-// ──────────────────────────────────────────
 async function start() {
   const { state, saveCreds } = await useMultiFileAuthState("auth");
 
@@ -191,25 +179,23 @@ async function start() {
 
   sock.ev.on("creds.update", saveCreds);
 
-  // ── إدارة الاتصال ──
   sock.ev.on("connection.update", async (update) => {
     const { connection, lastDisconnect, qr } = update;
 
     if (qr) {
-      console.log("\n📱 امسح QR التالي:\n");
       qrcode.generate(qr, { small: true });
     }
 
     if (connection === "open") {
-      console.log("✅ البوت متصل");
+      console.log("البوت متصل");
 
       if (!testSent) {
         testSent = true;
         try {
           await sendWelcomeMenu(sock, TEST_NUMBER);
-          console.log("📨 تم إرسال رسالة الاختبار إلى:", TEST_NUMBER);
+          console.log("تم إرسال رسالة الاختبار إلى:", TEST_NUMBER);
         } catch (err) {
-          console.error("❌ خطأ في إرسال رسالة الاختبار:", err);
+          console.error("خطأ في إرسال رسالة الاختبار:", err);
         }
       }
     }
@@ -217,17 +203,16 @@ async function start() {
     if (connection === "close") {
       const code = new Boom(lastDisconnect?.error)?.output?.statusCode;
       const shouldReconnect = code !== DisconnectReason.loggedOut;
-      console.log("❌ انقطع الاتصال، الكود:", code);
+      console.log("انقطع الاتصال، الكود:", code);
       if (shouldReconnect) {
-        console.log("🔄 جاري إعادة الاتصال...");
+        console.log("جاري إعادة الاتصال...");
         start();
       } else {
-        console.log("🚪 تم تسجيل الخروج. احذف مجلد auth وأعد التشغيل.");
+        console.log("تم تسجيل الخروج. احذف مجلد auth وأعد التشغيل.");
       }
     }
   });
 
-  // ── معالجة الرسائل الواردة ──
   sock.ev.on("messages.upsert", async ({ messages }) => {
     try {
       const msg = messages[0];
@@ -241,26 +226,21 @@ async function start() {
 
       const users = await loadUsers();
 
-      // ── مستخدم جديد ──
       if (!users.includes(jid)) {
         await saveUser(jid);
         await sendWelcomeMenu(sock, jid);
         await setActivity(jid);
         scheduleReminder(sock, jid);
-        console.log("👋 تم إرسال الترحيب إلى:", jid);
+        console.log("تم إرسال الترحيب إلى:", jid);
         return;
       }
 
-      // ── استخراج الخيار ──
       const selectedId = getSelectedId(msg);
 
-      // تجاهل الرسائل النصية العادية التي ليست أزرار
       if (!selectedId) return;
 
-      // المستخدم تفاعل → إلغاء التذكير
       await clearActivity(jid);
 
-      // ── طريقة الاستخدام → فيديو ──
       if (selectedId === "usage") {
         await sock.sendMessage(jid, {
           video: { url: VIDEO_PATH },
@@ -268,22 +248,20 @@ async function start() {
             "📖 *طريقة الاستخدام*\n\n" +
             "شاهد الفيديو التالي لمعرفة كيفية استخدام المنتج بشكل صحيح.",
         });
-      }
-
-      // ── الطلب ──
-      else if (selectedId === "order") {
+      } else if (selectedId === "order") {
         await sock.sendMessage(jid, {
           text:
-            "🛒 *لإتمام طلبك يكفي أن ترسل لنا:*\n\n" +
-            "الاسم:\nرقم الهاتف:\nالعنوان:\n\n" +
+            "🛒 *للطلب يكفي تخلي لينا:*\n\n" +
+            "الاسم:\n" +
+            "رقم الهاتف:\n" +
+            "العنوان:\n\n" +
             "🚚 فريق التوصيل سيتواصل معك في أقرب وقت.\n" +
-            "💳 الدفع عند الاستلام — التوصيل مجاناً\n\n" +
             "شكراً لثقتكم 🌷",
         });
       }
 
     } catch (err) {
-      console.error("❌ خطأ في استقبال الرسائل:", err);
+      console.error("خطأ في استقبال الرسائل:", err);
     }
   });
 }
