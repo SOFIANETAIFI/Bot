@@ -65,9 +65,9 @@ async function clearActivity(jid) {
 }
 
 async function sendWelcomeMenu(sock, jid) {
-  await sock.sendMessage(jid, {
+  await sendInteractiveMessage(sock, jid, {
     image: { url: IMAGE_PATH },
-    caption:
+    body:
       "💊 *اسم المنتج*\n" +
       "💰 99 درهم مع التوصيل مجاناً\n" +
       "🚚 الدفع عند الاستلام\n\n" +
@@ -77,12 +77,6 @@ async function sendWelcomeMenu(sock, jid) {
       "العنوان:\n\n" +
       "🚚 فريق التوصيل سيتواصل معك في أقرب وقت.\n" +
       "شكراً لثقتكم 🌷",
-  });
-
-  await sendInteractiveMessage(sock, jid, {
-    body:
-      "👋 *أهلاً بك!*\n\n" +
-      "اختر من الخيارات 👇",
     footer: "خدمة العملاء",
     title: "🌟 مرحباً بك",
     interactiveButtons: [
@@ -105,17 +99,13 @@ async function sendWelcomeMenu(sock, jid) {
 }
 
 async function sendReminderOffer(sock, jid) {
-  await sock.sendMessage(jid, {
+  await sendInteractiveMessage(sock, jid, {
     image: { url: OFFER_IMAGE },
-    caption:
+    body:
       "⏰ *عرض استثنائي خاص اليوم فقط!*\n\n" +
       "💊 *اسم المنتج*\n" +
       "💰 99 درهم مع التوصيل مجاناً\n" +
-      "🚚 الدفع عند الاستلام",
-  });
-
-  await sendInteractiveMessage(sock, jid, {
-    body:
+      "🚚 الدفع عند الاستلام\n\n" +
       "لا تفوّت الفرصة! اختر 👇",
     footer: "عرض محدود",
     title: "🔥 عرض اليوم فقط",
