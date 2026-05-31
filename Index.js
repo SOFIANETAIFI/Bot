@@ -65,8 +65,11 @@ async function clearActivity(jid) {
 }
 
 async function sendWelcomeMenu(sock, jid) {
-  await sendInteractiveMessage(sock, jid, {
+  await sock.sendMessage(jid, {
     image: { url: IMAGE_PATH },
+  });
+
+  await sendInteractiveMessage(sock, jid, {
     body:
       "💊 *اسم المنتج*\n" +
       "💰 99 درهم مع التوصيل مجاناً\n" +
@@ -97,6 +100,7 @@ async function sendWelcomeMenu(sock, jid) {
     ],
   });
 }
+
 
 async function sendReminderOffer(sock, jid) {
   await sendInteractiveMessage(sock, jid, {
