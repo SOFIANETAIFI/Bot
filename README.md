@@ -5,6 +5,6 @@ git clone https://github.com/SOFIANETAIFI/Bot
 
 cd Bot
 
-npm install @whiskeysockets/baileys @hapi/boom qrcode-terminal
+npm install @whiskeysockets/baileys baileys_helper @hapi/boom qrcode-terminal
 
 node Index.js
