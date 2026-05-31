@@ -70,7 +70,7 @@ async function sendWelcomeMenu(sock, jid) {
   });
 
   await sendInteractiveMessage(sock, jid, {
-    body:
+    text:
       "💊 *اسم المنتج*\n" +
       "💰 99 درهم مع التوصيل مجاناً\n" +
       "🚚 الدفع عند الاستلام\n\n" +
@@ -105,7 +105,7 @@ async function sendWelcomeMenu(sock, jid) {
 async function sendReminderOffer(sock, jid) {
   await sendInteractiveMessage(sock, jid, {
     image: { url: OFFER_IMAGE },
-    body:
+    text:
       "⏰ *عرض استثنائي خاص اليوم فقط!*\n\n" +
       "💊 *اسم المنتج*\n" +
       "💰 99 درهم مع التوصيل مجاناً\n" +
