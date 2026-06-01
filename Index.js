@@ -11,14 +11,18 @@ const fs = require("fs/promises");
 const path = require("path");
 const qrcode = require("qrcode-terminal");
 
-const USERS_FILE      = path.join(__dirname, "users.json");
-const ACTIVITY_FILE   = path.join(__dirname, "activity.json");
-const IMAGE_PATH      = path.join(__dirname, "media", "product.png");
-const VIDEO_PATH      = path.join(__dirname, "media", "usage.mp4");
-const OFFER_IMAGE     = path.join(__dirname, "media", "offer.png");
+const USERS_FILE     = path.join(__dirname, "users.json");
+const ACTIVITY_FILE  = path.join(__dirname, "activity.json");
+const ORDERS_FILE    = path.join(__dirname, "orders.json");
+const SESSIONS_FILE  = path.join(__dirname, "sessions.json");
+const REPLIED_FILE   = path.join(__dirname, "replied.json");
+const IMAGE_PATH     = path.join(__dirname, "media", "product.png");
+const VIDEO_PATH     = path.join(__dirname, "media", "usage.mp4");
+const OFFER_IMAGE    = path.join(__dirname, "media", "offer.png");
 
-const TEST_NUMBER     = "212616346157@s.whatsapp.net";
-const REMINDER_DELAY  = 24 * 60 * 60 * 1000;
+const TEST_NUMBER    = "212616346157@s.whatsapp.net";
+const ADMIN_NUMBER   = "212616346157@s.whatsapp.net";
+const REMINDER_DELAY = 24 * 60 * 60 * 1000;
 
 let testSent = false;
 
@@ -64,6 +68,49 @@ async function clearActivity(jid) {
   await saveJSON(ACTIVITY_FILE, data);
 }
 
+async function markReplied(jid) {
+  const data = await loadJSON(REPLIED_FILE);
+  data[jid] = true;
+  await saveJSON(REPLIED_FILE, data);
+}
+
+async function hasReplied(jid) {
+  const data = await loadJSON(REPLIED_FILE);
+  return data[jid] === true;
+}
+
+async function setSession(jid, data) {
+  const sessions = await loadJSON(SESSIONS_FILE);
+  sessions[jid] = data;
+  await saveJSON(SESSIONS_FILE, sessions);
+}
+
+async function getSession(jid) {
+  const sessions = await loadJSON(SESSIONS_FILE);
+  return sessions[jid] ?? null;
+}
+
+async function clearSession(jid) {
+  const sessions = await loadJSON(SESSIONS_FILE);
+  delete sessions[jid];
+  await saveJSON(SESSIONS_FILE, sessions);
+}
+
+async function markAsOrdered(jid) {
+  const data = await loadJSON(ORDERS_FILE);
+  if (!Array.isArray(data)) {
+    await saveJSON(ORDERS_FILE, []);
+    return;
+  }
+}
+
+async function saveOrder(order) {
+  const data = await loadJSON(ORDERS_FILE);
+  const orders = Array.isArray(data) ? data : [];
+  orders.push(order);
+  await saveJSON(ORDERS_FILE, orders);
+}
+
 async function sendWelcomeMenu(sock, jid) {
   await sock.sendMessage(jid, {
     image: { url: IMAGE_PATH },
@@ -71,14 +118,12 @@ async function sendWelcomeMenu(sock, jid) {
 
   await sendInteractiveMessage(sock, jid, {
     text:
-      "💰 99 درهم مع التوصيل مجاناً\n" +
-      "🚚 الدفع عند الاستلام\n" +
+      "💰 99 درهم الدفع عند الاستلام\n" +
+      "🚚 التوصيل مجاني لكل المدن المغربية\n" +
       "🛒 *للطلب يكفي تخلي لينا:*\n" +
       "الاسم:\n" +
       "رقم الهاتف:\n" +
-      "العنوان:\n" +
-      "🚚 فريق التوصيل سيتواصل معك في أقرب وقت.\n" +
-      "شكراً لثقتكم 🌷",
+      "العنوان:\n",
     footer: "عرض محدود",
     title: "",
     interactiveButtons: [
@@ -99,7 +144,6 @@ async function sendWelcomeMenu(sock, jid) {
     ],
   });
 }
-
 
 async function sendReminderOffer(sock, jid) {
   await sendInteractiveMessage(sock, jid, {
@@ -133,13 +177,18 @@ async function sendReminderOffer(sock, jid) {
 function scheduleReminder(sock, jid) {
   setTimeout(async () => {
     try {
+      const replied = await hasReplied(jid);
+      if (replied) {
+        await clearActivity(jid);
+        return;
+      }
+
       const lastActive = await getActivity(jid);
       if (!lastActive) return;
 
       const elapsed = Date.now() - lastActive;
       if (elapsed >= REMINDER_DELAY) {
         await sendReminderOffer(sock, jid);
-        console.log("تم إرسال التذكير إلى:", jid);
         await clearActivity(jid);
       }
     } catch (err) {
@@ -156,9 +205,67 @@ function getSelectedId(msg) {
     if (paramsJson) {
       return JSON.parse(paramsJson)?.id ?? null;
     }
-  } catch {
-  }
+  } catch {}
   return null;
+}
+
+async function startOrderFlow(sock, jid) {
+  await setSession(jid, { step: "name", name: "", phone: "", address: "" });
+  await sock.sendMessage(jid, {
+    text: "🛒 *سنكمل طلبك الآن!*\n\nمن فضلك أدخل *اسمك الكامل:*",
+  });
+}
+
+async function handleOrderFlow(sock, jid, text, session) {
+  if (session.step === "name") {
+    session.name = text.trim();
+    session.step = "phone";
+    await setSession(jid, session);
+    await sock.sendMessage(jid, {
+      text: `✅ شكراً *${session.name}*!\n\nالآن أدخل *رقم هاتفك:*`,
+    });
+  } else if (session.step === "phone") {
+    session.phone = text.trim();
+    session.step = "address";
+    await setSession(jid, session);
+    await sock.sendMessage(jid, {
+      text: "✅ تم حفظ الرقم!\n\nأدخل *عنوانك التفصيلي:*\n_(المدينة، الحي، الشارع)_",
+    });
+  } else if (session.step === "address") {
+    session.address = text.trim();
+
+    const order = {
+      jid,
+      name: session.name,
+      phone: session.phone,
+      address: session.address,
+      date: new Date().toLocaleString("ar-MA"),
+    };
+
+    await saveOrder(order);
+    await clearSession(jid);
+    await clearActivity(jid);
+    await markReplied(jid);
+
+    await sock.sendMessage(jid, {
+      text:
+        "✅ *تم استلام طلبك بنجاح!*\n\n" +
+        `👤 الاسم: ${session.name}\n` +
+        `📞 الهاتف: ${session.phone}\n` +
+        `📍 العنوان: ${session.address}\n\n` +
+        "🚚 فريق التوصيل سيتواصل معك قريباً\n" +
+        "شكراً لثقتكم 🌷",
+    });
+
+    await sock.sendMessage(ADMIN_NUMBER, {
+      text:
+        "🛒 *طلب جديد!*\n\n" +
+        `👤 الاسم: ${session.name}\n` +
+        `📞 الهاتف: ${session.phone}\n` +
+        `📍 العنوان: ${session.address}\n` +
+        `🕐 التاريخ: ${order.date}`,
+    });
+  }
 }
 
 async function start() {
@@ -185,7 +292,6 @@ async function start() {
         testSent = true;
         try {
           await sendWelcomeMenu(sock, TEST_NUMBER);
-          console.log("تم إرسال رسالة الاختبار إلى:", TEST_NUMBER);
         } catch (err) {
           console.error("خطأ في إرسال رسالة الاختبار:", err);
         }
@@ -195,9 +301,7 @@ async function start() {
     if (connection === "close") {
       const code = new Boom(lastDisconnect?.error)?.output?.statusCode;
       const shouldReconnect = code !== DisconnectReason.loggedOut;
-      console.log("انقطع الاتصال، الكود:", code);
       if (shouldReconnect) {
-        console.log("جاري إعادة الاتصال...");
         start();
       } else {
         console.log("تم تسجيل الخروج. احذف مجلد auth وأعد التشغيل.");
@@ -208,13 +312,22 @@ async function start() {
   sock.ev.on("messages.upsert", async ({ messages }) => {
     try {
       const msg = messages[0];
-
       if (!msg?.message) return;
       if (msg.key.fromMe) return;
 
       const jid = msg.key.remoteJid;
-      if (!jid) return;
-      if (jid.endsWith("@g.us")) return;
+      if (!jid || jid.endsWith("@g.us")) return;
+
+      const text =
+        msg.message?.conversation ||
+        msg.message?.extendedTextMessage?.text ||
+        "";
+
+      const session = await getSession(jid);
+      if (session && session.step !== "done") {
+        await handleOrderFlow(sock, jid, text, session);
+        return;
+      }
 
       const users = await loadUsers();
 
@@ -223,35 +336,29 @@ async function start() {
         await sendWelcomeMenu(sock, jid);
         await setActivity(jid);
         scheduleReminder(sock, jid);
-        console.log("تم إرسال الترحيب إلى:", jid);
         return;
       }
 
-      const selectedId = getSelectedId(msg);
+      if (text && text.trim() !== "") {
+        await markReplied(jid);
+        await clearActivity(jid);
+      }
 
+      const selectedId = getSelectedId(msg);
       if (!selectedId) return;
 
+      await markReplied(jid);
       await clearActivity(jid);
 
       if (selectedId === "usage") {
         await sock.sendMessage(jid, {
           video: { url: VIDEO_PATH },
           caption:
-            "📖 *طريقة الاستخدام*\n\n" +
-            "شاهد الفيديو التالي لمعرفة كيفية استخدام المنتج بشكل صحيح.",
+            "📖 *طريقة الاستخدام*\n\nشاهد الفيديو لمعرفة كيفية استخدام المنتج.",
         });
       } else if (selectedId === "order") {
-        await sock.sendMessage(jid, {
-          text:
-            "🛒 *للطلب يكفي تخلي لينا:*\n" +
-            "الاسم:\n" +
-            "رقم الهاتف:\n" +
-            "العنوان:\n" +
-            "🚚 فريق التوصيل سيتواصل معك في أقرب وقت.\n" +
-            "شكراً لثقتكم 🌷",
-        });
+        await startOrderFlow(sock, jid);
       }
-
     } catch (err) {
       console.error("خطأ في استقبال الرسائل:", err);
     }
