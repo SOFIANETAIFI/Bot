@@ -71,17 +71,16 @@ async function sendWelcomeMenu(sock, jid) {
 
   await sendInteractiveMessage(sock, jid, {
     text:
-      "💊 *اسم المنتج*\n" +
       "💰 99 درهم مع التوصيل مجاناً\n" +
-      "🚚 الدفع عند الاستلام\n\n" +
-      "🛒 *للطلب يكفي تخلي لينا:*\n\n" +
+      "🚚 الدفع عند الاستلام\n" +
+      "🛒 *للطلب يكفي تخلي لينا:*\n" +
       "الاسم:\n" +
       "رقم الهاتف:\n" +
-      "العنوان:\n\n" +
+      "العنوان:\n" +
       "🚚 فريق التوصيل سيتواصل معك في أقرب وقت.\n" +
       "شكراً لثقتكم 🌷",
-    footer: "خدمة العملاء",
-    title: "🌟 مرحباً بك",
+    footer: "عرض محدود",
+    title: "",
     interactiveButtons: [
       {
         name: "quick_reply",
@@ -106,13 +105,12 @@ async function sendReminderOffer(sock, jid) {
   await sendInteractiveMessage(sock, jid, {
     image: { url: OFFER_IMAGE },
     text:
-      "⏰ *عرض استثنائي خاص اليوم فقط!*\n\n" +
-      "💊 *اسم المنتج*\n" +
-      "💰 99 درهم مع التوصيل مجاناً\n" +
-      "🚚 الدفع عند الاستلام\n\n" +
+      "⏰ *عرض استثنائي خاص اليوم فقط!*\n" +
+      "💰 قطعتان بـ 99 درهم مع التوصيل مجاناً\n" +
+      "🚚 الدفع عند الاستلام\n" +
       "لا تفوّت الفرصة! اختر 👇",
     footer: "عرض محدود",
-    title: "🔥 عرض اليوم فقط",
+    title: "",
     interactiveButtons: [
       {
         name: "quick_reply",
@@ -245,10 +243,10 @@ async function start() {
       } else if (selectedId === "order") {
         await sock.sendMessage(jid, {
           text:
-            "🛒 *للطلب يكفي تخلي لينا:*\n\n" +
+            "🛒 *للطلب يكفي تخلي لينا:*\n" +
             "الاسم:\n" +
             "رقم الهاتف:\n" +
-            "العنوان:\n\n" +
+            "العنوان:\n" +
             "🚚 فريق التوصيل سيتواصل معك في أقرب وقت.\n" +
             "شكراً لثقتكم 🌷",
         });
